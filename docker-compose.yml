@@ -32,7 +32,6 @@ services:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
-      - ./dbt:/opt/airflow/dbt
     ports:
       - "8080:8080"
     depends_on:
