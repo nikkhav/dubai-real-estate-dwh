@@ -8,7 +8,7 @@ models:
   dwh:
     stg:
       +schema: stg
-      +materialized: table
+      +materialized: view
     dds:
       +schema: dds
       +materialized: table
