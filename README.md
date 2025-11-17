@@ -46,6 +46,10 @@ The project uses a modern **data platform stack**:
 2. Start the environment:
 
 ```bash
+docker compose build airflow
+```
+
+```bash
 docker-compose up -d
 ```
 

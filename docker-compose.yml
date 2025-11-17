@@ -10,50 +10,67 @@ services:
       - "15432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jovyan"]
       interval: 5s
       retries: 5
 
+  airflow-db:
+    image: postgres:16
+    container_name: airflow-db
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "15433:5432"
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 5s
+      retries: 5
+
   airflow:
-    image: apache/airflow:3.1.0-python3.11
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
     container_name: airflow
     restart: always
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://jovyan:jovyan@postgres:5432/dwh
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "admin:admin"
-      AIRFLOW_VAR_CDM_DDL_FILES_PATH: "/opt/airflow/dags/cdm/ddl"
-      AIRFLOW_VAR_DDS_DDL_FILES_PATH: "/opt/airflow/dags/dds/ddl"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
+
       AIRFLOW_VAR_STG_DDL_FILES_PATH: "/opt/airflow/dags/stg/ddl"
-      AIRFLOW_CONN_PG_DWH_CONNECTION: "postgres://jovyan:jovyan@postgres:5432/dwh"
+      AIRFLOW_VAR_DDS_DDL_FILES_PATH: "/opt/airflow/dags/dds/ddl"
+      AIRFLOW_VAR_CDM_DDL_FILES_PATH: "/opt/airflow/dags/cdm/ddl"
+
+      AIRFLOW_CONN_PG_DWH_CONNECTION: postgresql+psycopg2://jovyan:jovyan@postgres:5432/dwh
+
+      DBT_PROFILES_DIR: /opt/airflow/dbt
+
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
+      - ./dbt:/opt/airflow/dbt
     ports:
       - "8080:8080"
     depends_on:
+      airflow-db:
+        condition: service_healthy
       postgres:
         condition: service_healthy
     command: >
-      bash -c "airflow db migrate &&
-               airflow api-server &
-               airflow dag-processor &
-               airflow scheduler"
-
-  dbt:
-    image: ghcr.io/dbt-labs/dbt-postgres:1.9.0
-    container_name: dbt
-    platform: linux/amd64
-    working_dir: /usr/app
-    volumes:
-      - ./dbt:/usr/app
-    environment:
-      DBT_PROFILES_DIR: /usr/app
-    depends_on:
-      - postgres
+      bash -c "
+      airflow db migrate &&
+      airflow api-server &
+      airflow dag-processor &
+      airflow scheduler
+      "
 
   metabase:
     image: metabase/metabase:latest
@@ -68,9 +85,11 @@ services:
       MB_DB_PASS: jovyan
       MB_DB_HOST: postgres
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
+  airflow_db_data:
   logs:
   plugins:

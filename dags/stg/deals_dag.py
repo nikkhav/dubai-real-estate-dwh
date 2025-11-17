@@ -1,10 +1,13 @@
 import logging
 import pendulum
-from airflow.providers.standard.operators.bash import BashOperator
+
 from airflow.sdk import dag, task
 
-from lib.pg_connect import PgConnect
-from stg.deals_loader import DealsLoader, DealsOriginRepository, DealsDestRepository
+from lib.pg.pg_connect import PgConnect
+from stg.deals.deals_extractor import DealsExtractor
+from stg.deals.origin_repo import DealsOriginRepository
+from stg.deals.dest_repo import DealsDestRepository
+from repos.errors_repository import ErrorsRepository
 
 log = logging.getLogger(__name__)
 
@@ -15,28 +18,25 @@ URL = "https://gateway.dubailand.gov.ae/open-data/transactions/export/csv"
     schedule="@daily",
     start_date=pendulum.datetime(2025, 1, 1, tz="UTC"),
     catchup=False,
-    tags=['stg', 'source', 'loader'],
+    tags=['stg', 'source', 'extract'],
     is_paused_upon_creation=False
 )
-def stg_deals_dag():
+def stg_deals_extract_dag():
     dwh_pg_connect = PgConnect("PG_DWH_CONNECTION")
 
-    @task(task_id="stg_load_deals")
-    def stg_load_deals(logical_date=None):
-        repo_origin = DealsOriginRepository(URL)
-        repo_dest = DealsDestRepository()
-        loader = DealsLoader(repo_origin, dwh_pg_connect, repo_dest, log)
-        loaded_count = loader.load_deals(logical_date)
-        return f"stg_deals_loaded: {loaded_count} rows"
+    @task(task_id="stg_extract_deals")
+    def stg_extract_deals(logical_date=None):
+        origin = DealsOriginRepository(URL)
+        dest = DealsDestRepository()
+        errors = ErrorsRepository()
+        extractor = DealsExtractor(origin, dwh_pg_connect, dest, errors, log)
 
-    stg_load_deals = stg_load_deals()
+        count = extractor.extract_deals(logical_date)
+        return f"stg_deals_extracted: {count} rows"
 
-    run_dbt = BashOperator(
-        task_id="run_dbt",
-        bash_command="docker-compose run --rm dbt dbt run",
-    )
+    extract = stg_extract_deals()
 
-    stg_load_deals >> run_dbt
+    extract
 
 
-stg_deals_dag = stg_deals_dag()
+stg_deals_extract_dag = stg_deals_extract_dag()
