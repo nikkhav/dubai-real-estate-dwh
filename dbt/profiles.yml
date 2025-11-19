@@ -8,4 +8,4 @@ dwh:
       password: jovyan
       port: 5432
       dbname: dwh
-      schema: ""
+      schema: "stg"

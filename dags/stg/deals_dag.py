@@ -1,5 +1,6 @@
 import logging
 import pendulum
+from airflow.providers.standard.operators.bash import BashOperator
 
 from airflow.sdk import dag, task
 
@@ -36,7 +37,12 @@ def stg_deals_extract_dag():
 
     extract = stg_extract_deals()
 
-    extract
+    dbt_run = BashOperator(
+        task_id="dbt_build_dwh",
+        bash_command="cd /opt/airflow/dbt && dbt build --target dev"
+    )
+
+    extract >> dbt_run
 
 
 stg_deals_extract_dag = stg_deals_extract_dag()
