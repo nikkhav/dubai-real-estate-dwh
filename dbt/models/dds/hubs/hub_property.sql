@@ -1,7 +1,7 @@
 {{ config(materialized='incremental', unique_key='property_hk') }}
 
-with src as (
-    select
+WITH src AS (
+    SELECT
         {{ dbt_utils.generate_surrogate_key([
             "payload ->> 'PROJECT_EN'",
             "payload ->> 'AREA_EN'",
@@ -9,9 +9,9 @@ with src as (
             "payload ->> 'PROP_SB_TYPE_EN'",
             "payload ->> 'ROOMS_EN'",
             "payload ->> 'ACTUAL_AREA'"
-        ]) }} as property_hk,
-        load_ts as load_dts
-    from {{ ref('stg_deals') }}
+        ]) }} AS property_hk,
+        load_ts AS load_dts
+    FROM {{ ref('stg_deals') }}
 )
 
-select * from src
+SELECT * FROM src

@@ -1,16 +1,16 @@
 {{ config(materialized='incremental', unique_key='transaction_hk') }}
 
-with src as (
-    select
+WITH src AS (
+    SELECT
         transaction_number,
         ingestion_id,
         load_ts
-    from {{ ref('stg_deals') }}
+    FROM {{ ref('stg_deals') }}
 )
 
-select
-    {{ dbt_utils.generate_surrogate_key(['transaction_number']) }} as transaction_hk,
+SELECT
+    {{ dbt_utils.generate_surrogate_key(['transaction_number']) }} AS transaction_hk,
     transaction_number,
     ingestion_id,
-    load_ts as load_dts
-from src
+    load_ts AS load_dts
+FROM src
