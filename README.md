@@ -2,74 +2,92 @@
 
 ## Overview
 
-This project is a **data engineering pet project** that builds an end-to-end pipeline for real estate transaction data in Dubai. The Department of Land in Dubai provides an open API with daily data on property sales and rentals. The goal is to **automate data ingestion, transformation, and analytics** to enable insights into the real estate market and experiment with machine learning models.
+This project is an end-to-end Data Warehouse for Dubai real estate transactions, using a modern data platform stack with Airflow, dbt, PostgreSQL, and Metabase.
+
+The pipeline automatically ingests raw data from the Dubai Land Department API, cleans and transforms it using Data Vault 2.0 patterns, and exposes analytics-ready dimensional models for BI dashboards and ML experiments.
+
+---
 
 ## Architecture
 
-The project uses a modern **data platform stack**:
+### Technologies
+- **PostgreSQL** — main DWH with 4 layers:
+  - **stg** — raw data (JSONB)
+  - **dds** — Data Vault (hubs, links, satellites)
+  - **cdm** — Star Schema (fact + dimensions)
+  - **bi** — curated business views
 
-* **PostgreSQL** — central database, structured into three layers:
-   * **stg** (staging): raw JSON payloads, stored as-is.
-   * **dds** (data mart): cleaned and transformed tables.
-   * **cdm** (consumer data mart): curated analytics-ready views.
+- **Airflow** — orchestrates ingestion and runs dbt
+- **dbt** — models transformations (STG → DDS → CDM → BI)
+- **Metabase** — analytics and dashboards
+- **Docker Compose** — infrastructure orchestration
 
-* **Airflow** — orchestrates daily ingestion of new data from the API and schema initialization.
-* **dbt** — manages SQL transformations from staging to DDS and CDM.
-* **Metabase** — BI and visualization layer with interactive dashboards.
-* **Docker Compose** — runs the entire environment (Postgres, Airflow, dbt, Metabase) locally.
+---
 
 ## Data Flow
 
-1. **Ingestion**: Airflow fetches transactions daily from the Dubai API and stores them in the stg.raw_deals table.
-2. **Transformation**: dbt transforms staging data into DDS and CDM layers (cleans fields, builds dimensions and fact tables).
-3. **Analytics**: Metabase connects to CDM schemas to visualize trends (e.g., sales volume, top areas, property types).
-4. **ML (planned)**: prototype a regression model to predict property prices based on location, size, and type.
+### 1. **Ingestion (STG – Airflow)**
+- Fetch CSV from Dubai Land Department open API  
+- Store raw records in `stg.raw_deals`
+- Add metadata: `load_ts`, `ingestion_id`, `load_source`
 
-## Repository Structure
+### 2. **Transformation (dbt)**
 
-```
-.
-├── dags/                 # Airflow DAGs (ingestion, schema init)
-│   ├── stg/              # Staging layer DAGs
-│   ├── dds/              # Data mart layer DAGs
-│   ├── cdm/              # Consumer data mart layer DAGs
-│   └── lib/              # Shared utilities
-├── dbt/                  # dbt project (models, profiles.yml)
-├── docker-compose.yml    # Infrastructure definition
-├── README.md             # Project description
-└── .gitignore            # Ignore dbt logs, Airflow logs, compiled artifacts
-```
+#### **STG Layer**
+- Flatten JSONB
+- Type casting
+- Light cleanup  
+All STG models = **views**
+
+#### **DDS Layer (Data Vault)**
+- `hub_transaction`
+- `hub_property`
+- `link_transaction_property`
+- `sat_transaction_details`
+- `sat_property_details`
+
+Rules used:
+- surrogate keys → `dbt_utils.generate_surrogate_key`
+- hashdiff → change detection
+- incremental models with unique_key
+
+#### **CDM Layer (Star Schema)**
+- `fact_deals`
+- `dim_property`
+- `dim_project`
+- `dim_date`
+
+All CDM models = **tables**
+
+#### **BI Layer**
+Curated analytics models:
+- `project_overview`
+- `area_property_price`
+
+---
 
 ## Getting Started
 
-1. Clone the repository.
-2. Start the environment:
-
+### 1. Build Airflow image
 ```bash
 docker compose build airflow
 ```
 
+### 2. Start full environment
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
-3. Access services:
-   * Airflow UI → http://localhost:8080
-     * Login: `admin`
-     * Password: get it by running:
-       ```bash
-       docker exec -it airflow cat /opt/airflow/simple_auth_manager_passwords.json.generated
-       ```
-   * Metabase → http://localhost:3000
-   * Postgres → localhost:15432 (user: jovyan, password: jovyan, db: dwh)
+### 3. Access Web UIs
+| Service | URL |
+|--------|-----|
+| Airflow | http://localhost:8080 |
+| Metabase | http://localhost:3000 |
+| Postgres | localhost:15432 |
 
-## Roadmap
+You can use any username/password for Airflow during initial setup.
 
-* ✅ Staging schema (stg.raw_deals) with raw payloads.
-* 🚧 dbt transformations for DDS and CDM layers.
-* 🚧 Build dashboards in Metabase (sales volume, price per m², top projects).
-* 🚧 ML prototype for price prediction.
-
-## Motivation
-
-The real estate market in Dubai is one of the most dynamic in the world. With open data available, this project demonstrates how to **build a modern analytics pipeline from scratch** — useful for both learning and practical exploration of data engineering.
+### 4. Run dbt transformations manually (optional)
+```bash
+docker exec -it airflow bash -c "cd /opt/airflow/dbt && dbt build --target dev"
+```

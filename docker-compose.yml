@@ -45,8 +45,6 @@ services:
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
 
       AIRFLOW_VAR_STG_DDL_FILES_PATH: "/opt/airflow/dags/stg/ddl"
-      AIRFLOW_VAR_DDS_DDL_FILES_PATH: "/opt/airflow/dags/dds/ddl"
-      AIRFLOW_VAR_CDM_DDL_FILES_PATH: "/opt/airflow/dags/cdm/ddl"
 
       AIRFLOW_CONN_PG_DWH_CONNECTION: postgresql+psycopg2://jovyan:jovyan@postgres:5432/dwh
 

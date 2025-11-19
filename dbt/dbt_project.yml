@@ -15,3 +15,6 @@ models:
     cdm:
       +schema: cdm
       +materialized: table
+    bi:
+      +schema: bi
+      +materialized: view
